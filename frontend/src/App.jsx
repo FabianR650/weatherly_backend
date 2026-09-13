@@ -6,70 +6,94 @@ export default function App() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  async function getWeather () {
-    if (!city) return;
+  async function getWeather() {
+    if (!city.trim()) return;
 
     setLoading(true);
     setError(null);
     setWeather(null);
 
     try {
-  const res = await fetch(
-    `http://localhost:3000/api/weather?city=${encodeURIComponent(city)}`
-  );
+      // Handles trailing slash automatically to avoid double-slash routing issues on Vercel
+      const rawBaseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:3000";
+      const API_BASE_URL = rawBaseUrl.replace(/\/$/, "");
 
-    const data = await res.json();
+      const res = await fetch(
+        `${API_BASE_URL}/api/weather?city=${encodeURIComponent(city.trim())}`
+      );
 
-    if(!res.ok) { 
-      throw new Error(data.error || "Request failed");
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch weather data");
+      }
+
+      setWeather(data);
+    } catch (err) {
+      console.error("Error fetching weather:", err);
+      setError(err.message || "Something went wrong");
+    } finally {
+      setLoading(false);
     }
-
-    setWeather(data)
-  } catch (err) {
-    setError(err.message)
-  } finally {
-    setLoading(false);
   }
-}
 
-return (
-  <div style={{padding: 20, fontfamily: "san-serif"}}>
-    <h1>Weatherly</h1>
-    <input type="text"
-    placeholder="Enter city (e.g. London)"
-    value={city}
-    onChange={(e) => setCity(e.target.value)}
-    />
+  return (
+    <div style={{ padding: 20, fontFamily: "sans-serif", maxWidth: "600px", margin: "0 auto" }}>
+      <h1>Weatherly</h1>
 
-    <button onClick={getWeather} style={{ marginLeft: 8 }}>
-      Get Weather
-    </button>
-    {loading && <p>Loading...</p>}
-    {error && <p style={{ color: "red" }}>{error}</p>}
+      {/* Form wrapper enables Enter key submission */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          getWeather();
+        }}
+      >
+        <input
+          type="text"
+          placeholder="Enter city (e.g. London)"
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          style={{ padding: "8px", fontSize: "16px" }}
+        />
 
-    {weather && (
-      <div style={{ marginTop: 20 }}>
-        <h2>
-          {weather.location.name}, {weather.location.country}
-        </h2>
+        <button
+          type="submit"
+          disabled={loading || !city.trim()}
+          style={{ marginLeft: 8, padding: "8px 16px", fontSize: "16px", cursor: "pointer" }}
+        >
+          {loading ? "Loading..." : "Get Weather"}
+        </button>
+      </form>
 
-        <p>
-          {weather.current.temp} - {weather.current.description}
-        </p>
-        <p>Feels Like: {weather.current.feels_like}</p>
-        <p>Humidity: {weather.current.humidity}%</p>
-        <p>Wind: {weather.current.windSpeed}m/s</p>
+      {error && <p style={{ color: "red", marginTop: 16 }}>{error}</p>}
 
-        <h3>5-day Forecast</h3>
-        <ul>
-          {weather.forecast.map((day) => (
-            <li Key={day.date}>
-              {day.date}: {day.tempMin} / {day.tempMax} - {day.description}
-            </li>
-          ))}
-        </ul>
-      </div>
-    )}
-  </div>
-);
+      {weather && (
+        <div style={{ marginTop: 20 }}>
+          <h2>
+            {weather.location?.name}, {weather.location?.country}
+          </h2>
+
+          <p>
+            {weather.current?.temp}° - {weather.current?.description}
+          </p>
+          <p>Feels Like: {weather.current?.feels_like}°</p>
+          <p>Humidity: {weather.current?.humidity}%</p>
+          <p>Wind: {weather.current?.windSpeed} m/s</p>
+
+          {Array.isArray(weather.forecast) && weather.forecast.length > 0 && (
+            <>
+              <h3>5-day Forecast</h3>
+              <ul>
+                {weather.forecast.map((day, index) => (
+                  <li key={day.date || index}>
+                    {day.date}: {day.tempMin}° / {day.tempMax}° - {day.description}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
